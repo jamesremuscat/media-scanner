@@ -115,7 +115,7 @@ module.exports = function ({ config, db, logger }) {
     })
 
     if (doc.mediaPath && doc.mediaPath !== mediaPath) {
-      mediaLogger.info('Skipped')
+      mediaLogger.debug('Skipped')
       return
     }
 
@@ -138,7 +138,7 @@ module.exports = function ({ config, db, logger }) {
 
     await db.put(doc)
 
-    mediaLogger.info('Scanned')
+    mediaLogger.debug('Scanned')
   }
 
   async function generateThumb (doc) {
@@ -213,21 +213,43 @@ module.exports = function ({ config, db, logger }) {
   }
 
   function generateCinf (doc, json) {
-    let tb = (json.streams[0].time_base || '1/25').split('/')
+    let tb = [0, 1]
     let dur = parseFloat(json.format.duration) || (1 / 24)
 
-    let type = ' AUDIO '
-    if (json.streams[0].pix_fmt) {
+    console.log(json.streams)
+
+    let videoStream = null
+    let audioStream = null
+
+    let type = null
+
+    json.streams.forEach(
+      stream => {
+        if (stream.codec_type === 'audio') {
+          audioStream = stream
+        }
+        else if (stream.codec_type === 'video') {
+          videoStream = stream
+        }
+      }
+    );
+
+    if (videoStream !== null) {
+
       if (dur <= (1 / 24)) {
         type = ' STILL '
-        tb = [0,1]
-      } else {
-        type = ' MOVIE '
-        const fr = String(json.streams[0].avg_frame_rate || json.streams[0].r_frame_rate || '').split('/')
+        tb = [0, 1]
+      }
+      else {
+        const fr = String(videoStream.avg_frame_rate || videoStream.r_frame_rate || '').split('/')
         if (fr.length === 2) {
           tb = [ fr[1], fr[0] ]
         }
+        type = ' MOVIE '
       }
+    }
+    else if (audioStream !== null) {
+      type = ' AUDIO '
     }
 
     return [
